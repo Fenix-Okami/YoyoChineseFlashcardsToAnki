@@ -1,174 +1,48 @@
 #!/usr/bin/env python3
+"""YoYoChinese → Anki ETL helper CLI."""
+
+from __future__ import annotations
+
 import argparse
-import json
-import os
-import sys
-import time
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Set
-import hashlib
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-try:
-    # Use urllib to avoid external deps
-    import urllib.request
-    import urllib.error
-except Exception as e:
-    print(f"Failed to import urllib: {e}", file=sys.stderr)
-    sys.exit(1)
+from etl import extract, enrich, transform, load as load_step
 
 
-API_URL = "https://yoyochinese.com/api/v1/flashcards/manage/cards"
-CDN_AUDIO_BASE = "https://cdn.yoyochinese.com/audio/practice/"
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run ETL steps for YoYoChinese flashcards.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
-# Mapping of course IDs to ordered Level IDs used for Level subdecks.
-# Extend this dict manually for future courses as needed.
-LEVEL_IDS_BY_COURSE = {
-    # Course: 5f9c5382c32d410f1447bee9 → Levels 1..6
-    "5f9c5382c32d410f1447bee9": [
-        "5f9c5382c32d410f1447bef5",
-        "5f9c5382c32d410f1447bef6",
-        "5f9c5382c32d410f1447bef7",
-        "5f9c5382c32d410f1447bef8",
-        "5f9c5382c32d410f1447bef9",
-        "5f9c5382c32d410f1447befa",
-    ],
-    # Chinese Characters → Levels 1..6
-    "5f9c5382c32d410f1447beeb": [
-        "5f9c5382c32d410f1447bf01",
-        "5f9c5382c32d410f1447bf02",
-        "5f9c5382c32d410f1447bf03",
-        "5f9c5382c32d410f1447bf04",
-        "5f9c5382c32d410f1447bf05",
-        "5f9c5382c32d410f1447bf06",
-    ],
-    # Intermediate Conversational → Levels 1..6
-    "5f9c5382c32d410f1447beea": [
-        "5f9c5382c32d410f1447befb",
-        "5f9c5382c32d410f1447befc",
-        "5f9c5382c32d410f1447befd",
-        "5f9c5382c32d410f1447befe",
-        "5f9c5382c32d410f1447beff",
-        "5f9c5382c32d410f1447bf00",
-    ],
-    # Chinese Characters II → Levels 1..6
-    "5f9c5382c32d410f1447beed": [
-        "5f9c5382c32d410f1447bf0d",
-        "5f9c5382c32d410f1447bf0e",
-        "5f9c5382c32d410f1447bf0f",
-        "5f9c5382c32d410f1447bf10",
-        "5f9c5382c32d410f1447bf11",
-        "5f9c5382c32d410f1447bf12",
-    ],
-    # Upper Intermediate Conversational → Levels 1..6
-    "5f9c5382c32d410f1447beec": [
-        "5f9c5382c32d410f1447bf07",
-        "5f9c5382c32d410f1447bf08",
-        "5f9c5382c32d410f1447bf09",
-        "5f9c5382c32d410f1447bf0a",
-        "5f9c5382c32d410f1447bf0b",
-        "5f9c5382c32d410f1447bf0c",
-    ],
-    # Chinese Character Reader → Levels 1..6
-    "5f9c5382c32d410f1447beee": [
-        "5f9c5382c32d410f1447bf13",
-        "5f9c5382c32d410f1447bf14",
-        "5f9c5382c32d410f1447bf15",
-        "5f9c5382c32d410f1447bf16",
-        "5f9c5382c32d410f1447bf17",
-        "5f9c5382c32d410f1447bf18",
-    ],
-}
+    extract_parser = subparsers.add_parser("extract", help="Fetch flashcards + simple TSV/audio outputs.")
+    extract.configure_parser(extract_parser)
+    extract_parser.set_defaults(func=extract.run_from_args)
 
-# Human-friendly course names for selection and deck naming
-COURSE_NAMES: Dict[str, str] = {
-    "5f9c5382c32d410f1447bee9": "Beginner Conversational",
-    "5f9c5382c32d410f1447beeb": "Chinese Characters",
-    "5f9c5382c32d410f1447beea": "Intermediate Conversational",
-    "5f9c5382c32d410f1447beed": "Chinese Characters II",
-    "5f9c5382c32d410f1447beec": "Upper Intermediate Conversational",
-    "5f9c5382c32d410f1447beee": "Chinese Character Reader",
-}
+    enrich_parser = subparsers.add_parser("enrich", help="Download audio + build rich.tsv files.")
+    enrich.configure_parser(enrich_parser)
+    enrich_parser.set_defaults(func=enrich.run_from_args)
+
+    transform_parser = subparsers.add_parser("transform", help="Placeholder transform step (no-op).")
+    transform.configure_parser(transform_parser)
+    transform_parser.set_defaults(func=transform.run_from_args)
+
+    load_parser = subparsers.add_parser("load", help="Create an .apkg package from extracted data.")
+    load_step.configure_parser(load_parser)
+    load_parser.set_defaults(func=load_step.run_from_args)
+
+    return parser
 
 
-@dataclass
-class Flashcard:
-    id: str
-    code: str
-    masteryLevel: Optional[int]
-    wordType: Optional[int]
-    simplified: str
-    traditional: str
-    pinyin: str
-    english1: str
-    english2: str
-    audio_code_normal: Optional[str]
-    audio_code_slow: Optional[str]
-
-    @staticmethod
-    def from_api(obj: Dict) -> "Flashcard":
-        c = obj.get("content", {})
-        return Flashcard(
-            id=str(obj.get("id") or obj.get("_id") or ""),
-            code=obj.get("code") or "",
-            masteryLevel=obj.get("masteryLevel"),
-            wordType=obj.get("wordType"),
-            simplified=(c.get("simplified") or "").strip(),
-            traditional=(c.get("traditional") or "").strip(),
-            pinyin=(c.get("pinyin") or "").strip(),
-            english1=(c.get("english1") or "").strip(),
-            english2=(c.get("english2") or "").strip(),
-            audio_code_normal=c.get("normal"),
-            audio_code_slow=c.get("slow"),
-        )
-
-    def audio_filename(self, speed: str) -> Optional[str]:
-        code = None
-        if speed == "normal":
-            code = self.audio_code_normal
-        elif speed == "slow":
-            code = self.audio_code_slow
-        if not code:
-            return None
-        return f"{code}.mp3"
+def main(argv: list[str] | None = None) -> None:
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    func = getattr(args, "func", None)
+    if not func:
+        parser.print_help()
+        return
+    func(args)
 
 
-def build_headers(cookie: Optional[str]) -> Dict[str, str]:
-    headers = {
-        "accept": "*/*",
-        "content-type": "application/json",
-        # This header appears in the browser sample; likely optional.
-        "is-native": "false",
-    }
-    if cookie:
-        # Allow passing either just the cookie value or full header
-        if cookie.lower().startswith("cookie:"):
-            # Strip leading 'cookie:'
-            cookie_val = cookie.split(":", 1)[1].strip()
-        else:
-            cookie_val = cookie.strip()
-        headers["Cookie"] = cookie_val
-    return headers
-
-
-def http_post_json(url: str, body: Dict, headers: Dict[str, str], timeout: int = 30) -> Dict:
-    data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST")
-    for k, v in headers.items():
-        req.add_header(k, v)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            charset = resp.headers.get_content_charset() or "utf-8"
-            text = resp.read().decode(charset, errors="replace")
-            return json.loads(text)
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace") if hasattr(e, 'read') else str(e)
-        raise RuntimeError(f"HTTP {e.code} error: {detail}")
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"Network error: {e}")
-
-
+if __name__ == "__main__":
+    main()
 def http_download(
     url: str,
     dest_path: str,
