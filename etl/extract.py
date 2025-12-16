@@ -134,24 +134,83 @@ def main() -> None:
 
 
 def configure_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    parser.add_argument("--cookie", help="Cookie header value for yoyochinese.com (copy from browser).")
-    parser.add_argument("--deck-name", default="YoYoChinese", help="Deck name for output folders.")
-    parser.add_argument("--output", default="export", help="Output directory root (default: export).")
-    parser.add_argument("--per-page", type=int, default=50, help="Cards per API page (default: 50).")
-    parser.add_argument("--max", dest="max_cards", type=int, help="Max cards to fetch (testing only).")
-    parser.add_argument("--delay", type=float, default=0.2, help="Delay between API pages (seconds).")
-    parser.add_argument("--mastery-type", default="all", help="Mastery filter (all, learning, mastered, ...).")
-    parser.add_argument("--course-id", default="", help="Course ID filter (prompted when omitted).")
-    parser.add_argument("--level-id", default="", help="Level ID filter.")
-    parser.add_argument("--unit-id", default="", help="Unit ID filter.")
-    parser.add_argument("--lesson-id", default="", help="Lesson ID filter.")
-    parser.add_argument("--split-by-wordtype", action="store_true", help="Split outputs into Word/Sentence folders.")
+    parser.add_argument(
+        "--cookie",
+        default=common.env_str("YOYO_COOKIE"),
+        help="Cookie header value for yoyochinese.com (copy from browser). Can also be set via YOYO_COOKIE (.env).",
+    )
+    parser.add_argument(
+        "--deck-name",
+        default=common.env_str("YOYO_DECK_NAME", "YoYoChinese"),
+        help="Deck name for output folders (YOYO_DECK_NAME).",
+    )
+    parser.add_argument(
+        "--output",
+        default=common.env_str("YOYO_OUTPUT", "export"),
+        help="Output directory root (YOYO_OUTPUT, default: export).",
+    )
+    parser.add_argument(
+        "--per-page",
+        type=int,
+        default=common.env_int("YOYO_PER_PAGE", 50),
+        help="Cards per API page (YOYO_PER_PAGE, default: 50).",
+    )
+    parser.add_argument(
+        "--max",
+        dest="max_cards",
+        type=int,
+        default=common.env_optional_int("YOYO_MAX_CARDS"),
+        help="Max cards to fetch (YOYO_MAX_CARDS; testing only).",
+    )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=common.env_float("YOYO_DELAY", 0.2),
+        help="Delay between API pages in seconds (YOYO_DELAY, default: 0.2).",
+    )
+    parser.add_argument(
+        "--mastery-type",
+        default=common.env_str("YOYO_MASTERY_TYPE", "all"),
+        help="Mastery filter (YOYO_MASTERY_TYPE; all, learning, mastered, ...).",
+    )
+    parser.add_argument(
+        "--course-id",
+        default=common.env_str("YOYO_COURSE_ID", ""),
+        help="Course ID filter (YOYO_COURSE_ID; prompted when omitted).",
+    )
+    parser.add_argument(
+        "--level-id",
+        default=common.env_str("YOYO_LEVEL_ID", ""),
+        help="Level ID filter (YOYO_LEVEL_ID).",
+    )
+    parser.add_argument(
+        "--unit-id",
+        default=common.env_str("YOYO_UNIT_ID", ""),
+        help="Unit ID filter (YOYO_UNIT_ID).",
+    )
+    parser.add_argument(
+        "--lesson-id",
+        default=common.env_str("YOYO_LESSON_ID", ""),
+        help="Lesson ID filter (YOYO_LESSON_ID).",
+    )
+    parser.add_argument(
+        "--split-by-wordtype",
+        action="store_true",
+        default=common.env_bool("YOYO_SPLIT_BY_WORDTYPE", False),
+        help="Split outputs into Word/Sentence folders (YOYO_SPLIT_BY_WORDTYPE).",
+    )
     parser.add_argument(
         "--levels-subdecks",
         action="store_true",
+        default=common.env_bool("YOYO_LEVELS_SUBDECKS", False),
         help="Fetch each configured Level separately and write Level folders (requires a mapped course).",
     )
-    parser.add_argument("--audio-workers", type=int, default=8, help="Concurrent downloads for audio (default: 8).")
+    parser.add_argument(
+        "--audio-workers",
+        type=int,
+        default=common.env_int("YOYO_AUDIO_WORKERS", 8),
+        help="Concurrent downloads for audio (YOYO_AUDIO_WORKERS, default: 8).",
+    )
     return parser
 
 

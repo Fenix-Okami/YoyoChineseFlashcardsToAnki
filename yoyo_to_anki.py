@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 
-from etl import extract, enrich, transform, load as load_step
+from etl import common, extract, enrich, transform, load as load_step
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -32,6 +32,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # Load .env (if present) before configuring defaults / reading os.environ.
+    common.load_dotenv()
     parser = _build_parser()
     args = parser.parse_args(argv)
     func = getattr(args, "func", None)

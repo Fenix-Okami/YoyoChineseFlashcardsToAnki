@@ -72,7 +72,12 @@ def _enrich_partition(deck_root: str, partition: dict, workers: int) -> int:
 
 def configure_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("manifest", help="Path to manifest.json produced by the extract step.")
-    parser.add_argument("--audio-workers", type=int, default=8, help="Concurrent downloads for audio (default: 8).")
+    parser.add_argument(
+        "--audio-workers",
+        type=int,
+        default=common.env_int("YOYO_AUDIO_WORKERS", 8),
+        help="Concurrent downloads for audio (YOYO_AUDIO_WORKERS, default: 8).",
+    )
     return parser
 
 

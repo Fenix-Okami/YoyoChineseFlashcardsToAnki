@@ -67,23 +67,30 @@ def _read_first(paths: Iterable[str], default: str) -> str:
 
 
 def _build_model(script_dir: str) -> Any:
+    repo_root = os.path.abspath(os.path.join(script_dir, os.pardir))
     front_html = _read_first(
         [
+            os.path.join(repo_root, "anki_front_template.html"),
             os.path.join(script_dir, "anki_front_template.html"),
+            os.path.join(repo_root, "tools", "anki_front_template.html"),
             os.path.join(script_dir, "tools", "anki_front_template.html"),
         ],
         "{{simplified}}",
     )
     back_html = _read_first(
         [
+            os.path.join(repo_root, "anki_back_template.html"),
             os.path.join(script_dir, "anki_back_template.html"),
+            os.path.join(repo_root, "tools", "anki_back_template.html"),
             os.path.join(script_dir, "tools", "anki_back_template.html"),
         ],
         "{{simplified}}<br>{{pinyin}}<br>{{english}}",
     )
     css_text = _read_first(
         [
+            os.path.join(repo_root, "anki_style.css"),
             os.path.join(script_dir, "anki_style.css"),
+            os.path.join(repo_root, "tools", "anki_style.css"),
             os.path.join(script_dir, "tools", "anki_style.css"),
         ],
         ".card { font-family: Georgia; font-size: 14px; }",
@@ -215,8 +222,16 @@ def _build_decks_wordtype(
 
 def configure_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("manifest", help="Path to manifest.json produced by the extract step.")
-    parser.add_argument("--deck-name", help="Override deck name used for the package.")
-    parser.add_argument("--apkg-path", help="Optional explicit path for the output .apkg file.")
+    parser.add_argument(
+        "--deck-name",
+        default=common.env_str("YOYO_DECK_NAME"),
+        help="Override deck name used for the package (YOYO_DECK_NAME).",
+    )
+    parser.add_argument(
+        "--apkg-path",
+        default=common.env_str("YOYO_APKG_PATH"),
+        help="Optional explicit path for the output .apkg file (YOYO_APKG_PATH).",
+    )
     return parser
 
 

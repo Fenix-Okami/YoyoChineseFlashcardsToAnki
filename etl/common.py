@@ -84,6 +84,98 @@ COURSE_NAMES: Dict[str, str] = {
 }
 
 
+def load_dotenv(dotenv_path: Optional[str] = None, override: bool = False) -> None:
+    """Load environment variables from a .env file.
+
+    This is a small, dependency-free loader intended for local runs.
+    - If dotenv_path is None, it checks (in order):
+      1) <cwd>/.env
+      2) <repo_root>/.env (repo root = parent of this package)
+    - Existing environment variables are not overridden unless override=True.
+    """
+
+    candidates: List[str] = []
+    if dotenv_path:
+        candidates.append(dotenv_path)
+    else:
+        candidates.append(os.path.join(os.getcwd(), ".env"))
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+        candidates.append(os.path.join(repo_root, ".env"))
+
+    for path in candidates:
+        if not path or not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                for raw_line in handle:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if line.startswith("export "):
+                        line = line[len("export ") :].lstrip()
+                    if "=" not in line:
+                        continue
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip()
+                    if not key:
+                        continue
+                    if len(value) >= 2 and ((value[0] == value[-1] == '"') or (value[0] == value[-1] == "'")):
+                        value = value[1:-1]
+                    if not override and key in os.environ:
+                        continue
+                    os.environ[key] = value
+        except OSError:
+            continue
+
+
+def env_str(key: str, default: Optional[str] = None) -> Optional[str]:
+    value = os.getenv(key)
+    return value if value is not None and value != "" else default
+
+
+def env_int(key: str, default: int) -> int:
+    value = os.getenv(key)
+    if value is None or value.strip() == "":
+        return default
+    try:
+        return int(value.strip())
+    except ValueError:
+        return default
+
+
+def env_optional_int(key: str, default: Optional[int] = None) -> Optional[int]:
+    value = os.getenv(key)
+    if value is None or value.strip() == "":
+        return default
+    try:
+        return int(value.strip())
+    except ValueError:
+        return default
+
+
+def env_float(key: str, default: float) -> float:
+    value = os.getenv(key)
+    if value is None or value.strip() == "":
+        return default
+    try:
+        return float(value.strip())
+    except ValueError:
+        return default
+
+
+def env_bool(key: str, default: bool = False) -> bool:
+    value = os.getenv(key)
+    if value is None or value.strip() == "":
+        return default
+    norm = value.strip().lower()
+    if norm in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if norm in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    return default
+
+
 @dataclass
 class Flashcard:
     id: str

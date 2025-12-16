@@ -11,30 +11,34 @@ Prereqs
 - Your logged‑in `Cookie` for yoyochinese.com (copied from your browser DevTools → Network → any request to yoyochinese.com → Request Headers → Cookie). Keep this private.
 
 Usage
-1) From the repo root:
+1) Create a `.env` file (recommended)
 
-   python3 yoyo_to_anki.py \
-     --cookie "<paste your Cookie header value>" \
-     --output ./export \
-     --deck-name YoYoChinese \
-     --format simple \
-     --include-audio \
-     --audio-speed normal \
-     --per-page 100
+  Copy `.env.example` → `.env`, then paste your YoYoChinese cookie into `YOYO_COOKIE`.
+  You can also set other defaults there (deck name, output folder, per-page, etc.).
 
-   Notes:
-   - You can also set `YOYO_COOKIE` env var instead of `--cookie`.
-   - If you omit `--course-id`, the script prompts you to select a course and:
-     - Uses Level subdecks (`Level 1..N`) and writes per‑level TSVs.
-     - Deck name handling: if your deck name is exactly `YoYoChinese` (note the capitalization), it is auto‑set to `YoyoChinese <Course Name>` (e.g., `YoyoChinese Beginner Conversational`). If you leave the default deck name (`YoyoChinese`) or provide any other name, it is kept as‑is.
-   - `--format simple` → 2 columns (Front, Back). Front includes Simplified + optional audio; Back includes Pinyin — English.
-   - `--format rich` → 7 columns: Simplified, Pinyin, English, Traditional, Audio, Code, WordType.
-   - `--audio-workers` → max concurrent audio downloads (default: 8). Increase if your network is fast; reduce if you see rate limits.
-   - `--split-by-wordtype` → writes two TSVs instead of one: `<deck-name>.word.<format>.tsv` and `<deck-name>.sentence.<format>.tsv`, based on the card's `WordType`.
-   - `--levels-subdecks` → groups by course levels and produces Level subdecks (`Deck::Level 1`, `Deck::Level 2`, …). Also writes per‑level TSVs (`<deck-name>.level1.<format>.tsv`, etc.). This overrides `--split-by-wordtype` (Word/Sentence are combined per level). This is the default behavior when you select a course interactively.
-   - `--make-apkg` → also builds an `.apkg` using your HTML/CSS templates placed alongside the script (repo root; falls back to `tools/` if present). With default settings uses `Deck::Word` and `Deck::Sentence`. With `--levels-subdecks`, uses `Deck::Level N` subdecks.
-   - `--apkg-path` → optional path for the output `.apkg`. If not set, the filename defaults to `export/<apkg-base>.apkg`, where `<apkg-base>` is `YoyoChinese <Course Name>` when the course is recognized, otherwise it is your `--deck-name`.
-   - Use filters if needed: `--course-id`, `--level-id`, `--unit-id`, `--lesson-id`, `--mastery-type`.
+2) Extract (fetch flashcards)
+
+  python yoyo_to_anki.py extract --include-audio
+
+  This writes a `manifest.json` under `export/<deck-slug>/manifest.json` along with per-partition outputs.
+
+3) Enrich (optional: download audio + write rich.tsv)
+
+  python yoyo_to_anki.py enrich export/<deck-slug>/manifest.json
+
+  Note: `enrich` requires the manifest path produced by `extract`.
+
+4) Load (optional: build an .apkg)
+
+  python yoyo_to_anki.py load export/<deck-slug>/manifest.json
+
+Notes
+- CLI arguments override `.env` values when provided.
+- If you omit `--course-id`, the extract step prompts you to select a course and:
+  - Uses Level subdecks (`Level 1..N`) and writes per-level folders.
+  - Deck name handling: if your deck name is exactly `YoYoChinese` (note the capitalization), it is auto-set to `YoYoChinese <Course Name>` (e.g., `YoYoChinese Beginner Conversational`).
+- `--audio-workers` can be set via `YOYO_AUDIO_WORKERS` in `.env`.
+- Use filters if needed: `--course-id`, `--level-id`, `--unit-id`, `--lesson-id`, `--mastery-type`.
 
 Output
 - TSV at `export/<deck-name>.<format>.tsv` (or two files when using `--split-by-wordtype`, or one per level when using `--levels-subdecks`)

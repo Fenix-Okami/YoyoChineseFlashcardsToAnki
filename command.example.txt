@@ -1,8 +1,12 @@
-python3 yoyo_to_anki.py \
-     --cookie "CookieValue" \
-     --output ./export \
-     --format rich \
-     --include-audio \
-     --audio-speed normal \
-     --audio-workers 16 \
-     --make-apkg
+## Recommended: set everything in .env
+# 1) Copy .env.example -> .env
+# 2) Set YOYO_COOKIE (required) and any defaults you want
+
+# Extract (produces export/<deck-slug>/manifest.json)
+python yoyo_to_anki.py extract --include-audio
+
+# Enrich (requires the manifest path from extract)
+python yoyo_to_anki.py enrich export/<deck-slug>/manifest.json
+
+# Load (optional: build an .apkg)
+python yoyo_to_anki.py load export/<deck-slug>/manifest.json

@@ -1,3 +1,4 @@
 export
 __pycache__
 venv
+.env
