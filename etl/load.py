@@ -66,7 +66,7 @@ def _read_first(paths: Iterable[str], default: str) -> str:
     return default
 
 
-def _build_model(script_dir: str) -> Any:
+def _build_model(script_dir: str, theme_css: str = "") -> Any:
     repo_root = os.path.abspath(os.path.join(script_dir, os.pardir))
     front_html = _read_first(
         [
@@ -95,6 +95,10 @@ def _build_model(script_dir: str) -> Any:
         ],
         ".card { font-family: Georgia; font-size: 14px; }",
     )
+
+    # Append theme CSS so it wins over base styles even on older WebViews.
+    if theme_css:
+        css_text = (css_text.rstrip() + "\n" + theme_css + "\n")
 
     return genanki.Model(
         model_id=common.stable_id_from_name("YoYoChinese-Model-v2"),
@@ -257,7 +261,33 @@ def run_from_args(args: argparse.Namespace) -> None:
         return
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    model = _build_model(script_dir)
+
+    course_id = manifest.get("course_id") or manifest.get("courseId") or ""
+    # Course tile colors (left→right, top→bottom) from the YoYoChinese UI.
+    # Applied as per-course deck theme.
+    course_bg = {
+        # Beginner Conversational (teal)
+        "5f9c5382c32d410f1447bee9": "#00B3A6",
+        # Chinese Characters (purple)
+        "5f9c5382c32d410f1447beeb": "#B84AC8",
+        # Intermediate Conversational (blue)
+        "5f9c5382c32d410f1447beea": "#0A84D6",
+        # Chinese Characters II (pink)
+        "5f9c5382c32d410f1447beed": "#E44A78",
+        # Upper Intermediate Conversational (violet)
+        "5f9c5382c32d410f1447beec": "#6F61D9",
+        # Chinese Character Reader (orange)
+        "5f9c5382c32d410f1447beee": "#FF7A59",
+    }.get(str(course_id), "")
+
+    theme_css = ""
+    if course_bg:
+        theme_css = (
+            f".card {{ background-color: {course_bg}; color: #fff; }}\n"
+            f"hr {{ background: rgba(255,255,255,0.55); }}"
+        )
+
+    model = _build_model(script_dir, theme_css=theme_css)
 
     using_levels = bool(manifest.get("options", {}).get("using_levels"))
 
