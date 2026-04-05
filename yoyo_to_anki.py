@@ -206,7 +206,7 @@ def ensure_dir(path: str):
     os.makedirs(path, exist_ok=True)
 
 
-def main():
+def _legacy_main():
     parser = argparse.ArgumentParser(description="Export YoYoChinese flashcards to an Anki-friendly TSV and optional audio.")
     parser.add_argument("--cookie", help="Cookie header value used to authenticate to yoyochinese.com (copy from browser). You can pass with or without 'Cookie:' prefix.")
     parser.add_argument("--deck-name", default="YoyoChinese", help="Deck name (used for file names only).")
@@ -665,7 +665,3 @@ def main():
     print("Done. Import into Anki: File → Import → select TSV.\n"
           "- For 'simple' format: map Front=Field 1, Back=Field 2.\n"
           "- Place media from 'media/' folder into Anki media if not auto-imported.")
-
-
-if __name__ == "__main__":
-    main()

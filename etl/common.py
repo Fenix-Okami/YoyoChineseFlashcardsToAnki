@@ -356,6 +356,20 @@ def word_type_label(word_type: Optional[int]) -> str:
     return ""
 
 
+def segment_hanzi(simplified: str) -> str:
+    """Segment simplified Chinese into jieba words joined by '|'.
+
+    Returns e.g. '你|每天|怎么|上班|？' so the Anki template can group
+    per-character pinyin into word-level ruby annotations.
+    Falls back to character-by-character segmentation if jieba is unavailable.
+    """
+    try:
+        import jieba  # type: ignore
+        return "|".join(jieba.cut(simplified))
+    except ImportError:
+        return "|".join(simplified)
+
+
 def to_simple_fields(card: Flashcard) -> Tuple[str, str]:
     english = card.english1
     if card.english2:

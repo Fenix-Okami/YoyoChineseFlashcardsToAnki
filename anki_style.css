@@ -28,14 +28,15 @@ div {
 
 .hanzi {
   font-family: Kai;
-  font-size: 78px;
+  font-size: clamp(32px, 10vw, 78px);
   border-bottom: 3px solid rgba(0,0,0,0);
   transition: border 0.5s ease, padding 0.5s ease;
   margin-top: 20px;
 }
 
 .hanzi-ruby {
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .hanzi-ruby ruby {
@@ -55,7 +56,7 @@ div {
 
 .hanzi-ruby rt {
   font-family: Palatino;
-  font-size: 22px;
+  font-size: clamp(10px, 3vw, 22px);
   color: #00E5FF;
   line-height: 1.1;
   display: block;
@@ -137,12 +138,12 @@ div {
 }
 
 .english-front {
-  font-size: 28px;
+  font-size: clamp(16px, 5vw, 28px);
 }
 
 .english-back {
   margin-top: 8px;
-  font-size: 28px;
+  font-size: clamp(16px, 5vw, 28px);
 }
 
 .meaningSent {
@@ -198,5 +199,20 @@ div {
   font-size: 10px;
   margin-top: 2px;
   text-align: center;
+}
+
+.pinyin-toggle-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+  color: #fff;
+  font-family: Palatino;
+  font-size: 13px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.pinyin-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 

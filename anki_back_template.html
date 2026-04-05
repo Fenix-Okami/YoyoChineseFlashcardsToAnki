@@ -4,16 +4,30 @@
 
   <div class="buttons-row">
     {{#audio}}{{audio}}{{/audio}}
+    <button id="pinyin-toggle" class="pinyin-toggle-btn"></button>
   </div>
 </div>
 
 <script>
   (function () {
     var target = document.getElementById('hanzi-ruby');
+    var toggleBtn = document.getElementById('pinyin-toggle');
     if (!target) return;
 
     var hanzi = "{{simplified}}";
     var pinyin = "{{pinyin}}";
+    var segmented = "{{pinyin_segmented}}";
+
+    var MODES = ['grouped', 'singular', 'none'];
+    var MODE_LABELS = { grouped: '拼: grouped', singular: '拼: singular', none: '拼: off' };
+    var STORAGE_KEY = 'yoyo_pinyin_mode';
+
+    function getMode() {
+      try { return localStorage.getItem(STORAGE_KEY) || 'grouped'; } catch (e) { return 'grouped'; }
+    }
+    function setMode(m) {
+      try { localStorage.setItem(STORAGE_KEY, m); } catch (e) {}
+    }
 
     function escapeHtml(s) {
       return String(s)
@@ -24,30 +38,97 @@
         .replace(/\'/g, '&#39;');
     }
 
-    function isHanziChar(ch) {
-      return /[\u3400-\u9FFF]/.test(ch);
+    function isHanziChar(ch) { return /[\u3400-\u9FFF]/.test(ch); }
+    function isWordChar(ch) { return /[A-Za-z0-9]/.test(ch); }
+
+    function getSyllables() {
+      return pinyin.replace(/\s+/g, ' ').trim().split(' ')
+        .filter(function (t) { return t && t !== '/' && t !== '／' && t !== '-'; });
     }
 
-    // Split pinyin into syllables; drop common separators.
-    var syllables = pinyin
-      .replace(/\s+/g, ' ')
-      .trim()
-      .split(' ')
-      .filter(function (t) { return t && t !== '/' && t !== '／' && t !== '-'; });
-
-    var si = 0;
-    var out = '';
-    for (var i = 0; i < hanzi.length; i++) {
-      var ch = hanzi[i];
-      if (isHanziChar(ch)) {
-        var syl = (si < syllables.length) ? syllables[si++] : '';
-        out += '<ruby><rb>' + escapeHtml(ch) + '</rb><rt>' + escapeHtml(syl) + '</rt></ruby>';
-      } else {
-        out += escapeHtml(ch);
+    function renderSingular(syllables) {
+      var si = 0, out = '', i = 0;
+      while (i < hanzi.length) {
+        var ch = hanzi[i];
+        if (isHanziChar(ch)) {
+          var syl = si < syllables.length ? syllables[si++] : '';
+          out += '<ruby><rb>' + escapeHtml(ch) + '</rb><rt>' + escapeHtml(syl) + '</rt></ruby>';
+          i++;
+        } else if (isWordChar(ch)) {
+          var ws = i;
+          while (i < hanzi.length && isWordChar(hanzi[i])) { i++; }
+          var latinWord = hanzi.slice(ws, i);
+          if (si < syllables.length && syllables[si].toLowerCase() === latinWord.toLowerCase()) { si++; }
+          out += escapeHtml(latinWord);
+        } else {
+          out += escapeHtml(ch);
+          i++;
+        }
       }
+      return out;
     }
 
-    target.innerHTML = out || escapeHtml(hanzi);
+    function renderGrouped(syllables) {
+      if (!segmented) return renderSingular(syllables);
+      var segs = segmented.split('|');
+      var si = 0, out = '';
+      for (var wi = 0; wi < segs.length; wi++) {
+        var seg = segs[wi];
+
+        // Count hanzi chars in this segment.
+        var hCount = 0;
+        for (var ci = 0; ci < seg.length; ci++) {
+          if (isHanziChar(seg[ci])) hCount++;
+        }
+
+        // Count latin word tokens in this segment that appear as syllable tokens
+        // (so the syllable index stays aligned for subsequent segments).
+        var latinConsumed = 0, ti = 0;
+        while (ti < seg.length) {
+          if (isWordChar(seg[ti])) {
+            var lws = ti;
+            while (ti < seg.length && isWordChar(seg[ti])) { ti++; }
+            var lw = seg.slice(lws, ti);
+            var pos = si + hCount + latinConsumed;
+            if (pos < syllables.length && syllables[pos].toLowerCase() === lw.toLowerCase()) {
+              latinConsumed++;
+            }
+          } else { ti++; }
+        }
+
+        if (hCount > 0) {
+          var rt = syllables.slice(si, si + hCount).join(' ');
+          si += hCount + latinConsumed;
+          out += '<ruby><rb>' + escapeHtml(seg) + '</rb><rt>' + escapeHtml(rt) + '</rt></ruby>';
+        } else {
+          si += latinConsumed;
+          out += escapeHtml(seg);
+        }
+      }
+      return out;
+    }
+
+    function render(mode) {
+      var syllables = getSyllables();
+      var html;
+      if (mode === 'grouped') html = renderGrouped(syllables);
+      else if (mode === 'singular') html = renderSingular(syllables);
+      else html = escapeHtml(hanzi);
+      target.innerHTML = html || escapeHtml(hanzi);
+      if (toggleBtn) toggleBtn.textContent = MODE_LABELS[mode];
+    }
+
+    var currentMode = getMode();
+    render(currentMode);
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', function () {
+        var idx = MODES.indexOf(currentMode);
+        currentMode = MODES[(idx + 1) % MODES.length];
+        setMode(currentMode);
+        render(currentMode);
+      });
+    }
   })();
 </script>
 

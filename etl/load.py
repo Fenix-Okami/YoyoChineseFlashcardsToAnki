@@ -101,7 +101,7 @@ def _build_model(script_dir: str, theme_css: str = "") -> Any:
         css_text = (css_text.rstrip() + "\n" + theme_css + "\n")
 
     return genanki.Model(
-        model_id=common.stable_id_from_name("YoYoChinese-Model-v2"),
+        model_id=common.stable_id_from_name("YoYoChinese-Model-v3"),
         name="YoYoChinese Model",
         fields=[
             {"name": "index"},
@@ -111,6 +111,7 @@ def _build_model(script_dir: str, theme_css: str = "") -> Any:
             {"name": "english"},
             {"name": "audio"},
             {"name": "CardType"},
+            {"name": "pinyin_segmented"},
         ],
         templates=[
             {
@@ -151,6 +152,7 @@ def _notes_from_cards(
             else:
                 print(f"  WARN: audio missing for {index_val or card.simplified}: {media_path}")
         label = common.word_type_label(card.wordType) or "Word"
+        segmented = common.segment_hanzi(card.simplified)
         note = genanki.Note(
             model=model,
             fields=[
@@ -161,6 +163,7 @@ def _notes_from_cards(
                 english,
                 audio_field,
                 label.lower(),
+                segmented,
             ],
         )
         notes.append(note)
@@ -178,14 +181,21 @@ def _build_decks_levels(
     media_files: Set[str] = set()
     seen_indexes: Set[str] = set()
     for partition in sorted(partitions, key=lambda p: (p.get("level_index") or 0, p["label"])):
-        deck_name = f"{base_name}::{partition['label']}"
-        deck = genanki.Deck(common.stable_id_from_name(deck_name), deck_name)
+        level_name = f"{base_name}::{partition['label']}"
+        vocab_name = f"{level_name}::Vocabulary"
+        phrases_name = f"{level_name}::Phrases"
+        deck_vocab = genanki.Deck(common.stable_id_from_name(vocab_name), vocab_name)
+        deck_phrases = genanki.Deck(common.stable_id_from_name(phrases_name), phrases_name)
         cards = _load_cards(os.path.join(deck_root, partition["files"]["cards_json"].replace("/", os.sep)))
         media_dir = os.path.join(deck_root, partition["files"]["media_dir"].replace("/", os.sep))
         notes = _notes_from_cards(cards, model, audio_speed, media_dir, media_files, seen_indexes)
         for note in notes:
-            deck.add_note(note)
-        decks.append(deck)
+            if note.fields[6] == "sentence":
+                deck_phrases.add_note(note)
+            else:
+                deck_vocab.add_note(note)
+        decks.append(deck_vocab)
+        decks.append(deck_phrases)
     return decks, media_files
 
 
@@ -265,26 +275,33 @@ def run_from_args(args: argparse.Namespace) -> None:
     course_id = manifest.get("course_id") or manifest.get("courseId") or ""
     # Course tile colors (left→right, top→bottom) from the YoYoChinese UI.
     # Applied as per-course deck theme.
+    # Each entry is (top_color, bottom_color) for a gentle vertical gradient.
+    # Colors are a darkened version of the original YoYoChinese tile palette.
     course_bg = {
         # Beginner Conversational (teal)
-        "5f9c5382c32d410f1447bee9": "#00B3A6",
+        "5f9c5382c32d410f1447bee9": ("#008F84", "#005E57"),
         # Chinese Characters (purple)
-        "5f9c5382c32d410f1447beeb": "#B84AC8",
+        "5f9c5382c32d410f1447beeb": ("#9438A3", "#61207A"),
         # Intermediate Conversational (blue)
-        "5f9c5382c32d410f1447beea": "#0A84D6",
+        "5f9c5382c32d410f1447beea": ("#0868AB", "#044370"),
         # Chinese Characters II (pink)
-        "5f9c5382c32d410f1447beed": "#E44A78",
+        "5f9c5382c32d410f1447beed": ("#B83860", "#7A1E3E"),
         # Upper Intermediate Conversational (violet)
-        "5f9c5382c32d410f1447beec": "#6F61D9",
+        "5f9c5382c32d410f1447beec": ("#574DAE", "#342E78"),
         # Chinese Character Reader (orange)
-        "5f9c5382c32d410f1447beee": "#FF7A59",
+        "5f9c5382c32d410f1447beee": "#CC6244",
     }.get(str(course_id), "")
 
     theme_css = ""
     if course_bg:
+        if isinstance(course_bg, tuple):
+            top, bottom = course_bg
+        else:
+            top = bottom = course_bg
         theme_css = (
-            f".card {{ background-color: {course_bg}; color: #fff; }}\n"
-            f"hr {{ background: rgba(255,255,255,0.55); }}"
+            f"html, body {{ background: linear-gradient(to bottom, {top}, {bottom}); background-attachment: fixed; }}\n"
+            f".card {{ background: transparent; color: #fff; }}\n"
+            f"hr {{ background: rgba(255,255,255,0.45); }}"
         )
 
     model = _build_model(script_dir, theme_css=theme_css)
