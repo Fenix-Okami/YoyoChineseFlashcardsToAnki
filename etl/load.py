@@ -182,8 +182,9 @@ def _build_decks_levels(
     seen_indexes: Set[str] = set()
     for partition in sorted(partitions, key=lambda p: (p.get("level_index") or 0, p["label"])):
         level_name = f"{base_name}::{partition['label']}"
-        vocab_name = f"{level_name}::Vocabulary"
-        phrases_name = f"{level_name}::Phrases"
+        # Numeric prefixes keep the sub-decks in order when the level is expanded.
+        vocab_name = f"{level_name}::1-Vocabulary"
+        phrases_name = f"{level_name}::2-Phrases"
         deck_vocab = genanki.Deck(common.stable_id_from_name(vocab_name), vocab_name)
         deck_phrases = genanki.Deck(common.stable_id_from_name(phrases_name), phrases_name)
         cards = _load_cards(os.path.join(deck_root, partition["files"]["cards_json"].replace("/", os.sep)))
@@ -206,8 +207,10 @@ def _build_decks_wordtype(
     deck_root: str,
     audio_speed: str,
 ) -> Tuple[List[Any], Set[str]]:
-    deck_word = genanki.Deck(common.stable_id_from_name(f"{base_name}::Word"), f"{base_name}::Word")
-    deck_sentence = genanki.Deck(common.stable_id_from_name(f"{base_name}::Sentence"), f"{base_name}::Sentence")
+    word_name = f"{base_name}::1-Word"
+    sentence_name = f"{base_name}::2-Sentence"
+    deck_word = genanki.Deck(common.stable_id_from_name(word_name), word_name)
+    deck_sentence = genanki.Deck(common.stable_id_from_name(sentence_name), sentence_name)
     media_files: Set[str] = set()
     seen_indexes: Set[str] = set()
 

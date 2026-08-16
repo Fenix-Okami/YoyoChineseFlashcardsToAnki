@@ -42,8 +42,10 @@
     function isWordChar(ch) { return /[A-Za-z0-9]/.test(ch); }
 
     function getSyllables() {
-      return pinyin.replace(/\s+/g, ' ').trim().split(' ')
-        .filter(function (t) { return t && t !== '/' && t !== '／' && t !== '-'; });
+      // Tokenize on letters/digits, not whitespace: punctuation never becomes a
+      // syllable ("wǒ yě shì 。"), fused tokens split ("bái。qǐng", "Q1：nǐ"),
+      // and erhua parens split ("diǎn(r)" -> diǎn + r for 点儿).
+      return pinyin.match(/[A-Za-z0-9À-ɏḀ-ỿ]+/g) || [];
     }
 
     function renderSingular(syllables) {
